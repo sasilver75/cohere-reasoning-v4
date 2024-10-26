@@ -23,12 +23,22 @@ This environment variable file is git-ignored, so your precious credentials won'
 
 
 ## Processing data
-To run the full pipeline to completion, do the following:
+To generate straight shot solutions (n solution attempts per problem, regardless of whether they are correct or not), run:
+```bash
+python generate_straight_shot.py
+```
 
-Download the dataset from HuggingFace by running `python download_dataset.py`
+To generate completions for a dataframe with prefixes, run
+```bash
+python generate_completions.py
+```
 
-Generate weak solutions by running `python perturbation/weak_model/run.py`
+To generate prefixes (meaning n solutions with incorrect verifications), run
+```bash
+python generate_prefixes.py
+```
 
-Generate completions by running `python completion/run.py`
+View the results of the straight shot solutions by running `python vieww__ss_results.py` (Make sure the file points to the correct CSV file) 
 
-View the results of the completions by running `python completion__view_problem_solution_prefix_trace_completion.py` (Make sure the file points to the correct CSV file) 
+View the results of the completions by running `python view__completions_results.py` (Make sure the file points to the correct CSV file) 
+
