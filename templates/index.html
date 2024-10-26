@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CN K12 Math Problems Viewer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            display: flex;
+            justify-content: space-between;
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .left-column, .right-column {
+            width: 48%;
+        }
+        h2 {
+            color: #333;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+        }
+        h3 {
+            color: #666;
+        }
+        p {
+            margin-bottom: 20px;
+        }
+        .navigation {
+            text-align: center;
+            margin-top: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            margin: 0 10px;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="left-column">
+            <h2>Row Id: <span id="row-id"></span></h2>
+            <h3>Problem:</h3>
+            <p id="problem"></p>
+            <h3>Ground Truth Solution:</h3>
+            <p id="ground-truth-solution"></p>
+        </div>
+        <div class="right-column">
+            <h3>Weak Solution:</h3>
+            <p id="weak-solution"></p>
+            <h3>Verification:</h3>
+            <p id="verification"></p>
+            <h3>Verification Reasoning:</h3>
+            <p id="reasoning"></p>
+            <h3>Verification Prefix:</h3>
+            <p id="prefix"></p>
+        </div>
+    </div>
+    <div class="navigation">
+        <button id="prev-btn" onclick="navigate(-1)">Previous</button>
+        <button id="next-btn" onclick="navigate(1)">Next</button>
+    </div>
+
+    <script>
+        let currentIndex = 0;
+        let totalRecords = 0;
+
+        function updateUI(data) {
+            document.getElementById('row-id').textContent = data.row_id;
+            document.getElementById('problem').textContent = data.problem;
+            document.getElementById('ground-truth-solution').textContent = data.ground_truth_solution;
+            document.getElementById('weak-solution').textContent = data.weak_solution;
+            document.getElementById('verification').textContent = data.verification;
+            document.getElementById('reasoning').textContent = data.reasoning;
+            document.getElementById('prefix').textContent = data.prefix;
+
+            document.getElementById('prev-btn').disabled = (currentIndex === 0);
+            document.getElementById('next-btn').disabled = (currentIndex === totalRecords - 1);
+        }
+
+        function fetchData(index) {
+            fetch(`/data/${index}`)
+                .then(response => response.json())
+                .then(data => {
+                    updateUI(data);
+                    totalRecords = data.total_records;
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        function navigate(direction) {
+            currentIndex += direction;
+            fetchData(currentIndex);
+        }
+
+        // Initial load
+        fetchData(currentIndex);
+    </script>
+</body>
+</html>

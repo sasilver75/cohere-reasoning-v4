@@ -1,0 +1,73 @@
+The 25s are all "together"
+They're basically using the latest prompts IIRC, made on like Oct 24 or so. (so there have been some small changes).
+
+------
+
+The 300 I ran through at Oct 25 midnight, it cost like 20 buckets.
+It's 300 questions, 5 solutions per question, using the strong model. The point is to identify "easy" problems to then create prefixes for using the weak completer.
+
+
+datasets/cn_k12_math_problems_ss_solveable_problems_command-r-03-2024_82_5.csv
+is the 300 that we ran through above with teh storng on, and the n Iidentified the row_ids for which the strong model had a 40% or higher success rate.
+Now I'm going to get completions for these.
+
+datasets/cn_k12_math_problems_completions_command-r-03-2024_ALL_5_OFF.csv
+is the completions for these.
+
+datasets/cn_k12_math_problems_completions_command-r-plus-08-2024_ALL_5_OFF_INCORRECT_PREFIXES.csv
+Is the completions, but filtered for the ones where the weak prefix was from a failed weak solution.
+Let's examine some of these!
+
+
+----------
+
+Next step filter for the incorrect weak completions and get the r
+
+
+Diagram or flowchart for this process...
+
+
+
+The credit budget is 100, we'll just re-up that.
+In theory if we awnt to be slightly more efficient, there's an an early stopping
+
+If we want a weak completion, we don't need all 5.
+
+
+
+When you do the initial 5 completions from the strong completer
+
+
+
+filter the weak prefixes to incorrect
+........
+
+Those scenarios are all co-plottable on the same plottable
+The plot
+
+How does the distribution aross prompts or number of atetmpts to get right differ for the settings
+of offpolicy (weakperturb, strongcompletion) and (strongperturb, strongcompletion).
+
+The last setting we could do is.
+
+
+He thinks naive 
+Asking the model where it made a mistake giving a final answer is going to be pretty brittle.
+He think it's going to be super noisy.
+
+
+If we do a simple truncation, we have to try to see.
+First, three sentences, or 10% of tokens... something like that. This is a more consistent setting.
+He thinks it will still work more or less.
+
+He thinks as long as you have a relatively low temperature, it will 
+
+
+
+He would do naive truncation everywhere -- it's a more controlled setting.
+I think we should try to do the... 10% or 20% of the solution.
+
+
+
+
+Also want to know how performance changes at an individual question/solution level, in addition to an aggregate level.

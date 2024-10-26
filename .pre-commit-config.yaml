@@ -1,0 +1,23 @@
+repos:
+  - repo: https://github.com/psf/black
+    rev: 24.8.0
+    hooks:
+      - id: black
+        language_version: python3.12
+        name: Black
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        name: Sort imports
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-yaml
+        name: Check YAML
+      - id: check-json
+        name: Check JSON
+      - id: check-toml
+        name: Check TOML
+      - id: detect-private-key
+        name: Check for Private Keys
