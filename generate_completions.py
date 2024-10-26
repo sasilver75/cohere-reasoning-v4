@@ -13,7 +13,7 @@ from tqdm.asyncio import tqdm as atqdm
 import prompts
 from utils import (
     VerificationResult,
-    extract_verification_from_response,
+    _generate_verification,
     get_update_request_count,
 )
 
@@ -39,56 +39,7 @@ async def verify_row(row: pd.Series) -> VerificationResult:
     # The full solution is the erroneous prefix + strong completer completion.
     completion_solution = row["prefix"] + " " + row["completion"]
 
-    retries_remaining = 5
-    while retries_remaining:
-        try:
-            update_request_count("verify solution")
-            response = await asyncio.wait_for(
-                co_async.chat(
-                    model=verifier_name,
-                    messages=[
-                        {
-                            "role": "user",
-                            "content": prompts.VERIFY_SOLUTION_PROMPT_WITH_PREFIX.format(
-                                problem=problem,
-                                solution=ground_truth_solution,
-                                candidate_solution=completion_solution,
-                            ),
-                        }
-                    ],
-                    temperature=0.0,
-                ),
-                timeout=60,
-            )
-            return extract_verification_from_response(
-                response.message.content[0].text, row_id, solution_idx
-            )
-        except asyncio.TimeoutError as e:
-            retries_remaining -= 1
-            if retries_remaining:
-                print(
-                    f"Timeout occurred when generating verification {solution_idx} for problem {row_id}. Retrying with {retries_remaining} retries remaining."
-                )
-            else:
-                # If this ever happens (which it shouldn't), let's raise the error so that everything falls over and I can complain to Eddie.
-                print(
-                    f"Fatal: Timeout occurred when generating verification {solution_idx} for problem {row_id}, then ran out of retries. Reraising error."
-                )
-                raise e
-        except (
-            Exception
-        ) as e:  # Note that Python only executes the first block that matches the raised exception, so there's no worry about TimeoutError double-decrementing retries.
-            # I think the most likely reason for another exception is going to be some sort of parsing error in extraction, so let's just rerun that one.
-            retries_remaining -= 1
-            if retries_remaining:
-                print(
-                    f"A non-timeout exception occurred when generating verification {solution_idx} for problem {row_id}. Reraising error {type(e).__name__}: {e}"
-                )
-            else:
-                print(
-                    f"Fatal: A non-timeout exception occurred when generating verification {solution_idx} for problem {row_id}, then ran out of retries. Reraising error {type(e).__name__}: {e}"
-                )
-                raise e
+    return await _generate_verification(row_id, problem, ground_truth_solution, completion_solution, solution_idx, update_request_count, verifier_name)
 
 
 async def verify_data(df: pd.DataFrame):

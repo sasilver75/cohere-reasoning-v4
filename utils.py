@@ -202,27 +202,14 @@ def extract_verification_from_response(
     )
 
 
-async def generate_strong_verifications(
-    row_id: int,
-    problem: str,
-    ground_truth_solution: str,
-    candidate_solutions: list[str],
-    update_request_count: Callable[[str], None], 
-    strong_verifier_name: str
-) -> list[VerificationResult]:
-    """
-    Given a question, ground-truth solution, andcollection of collection of candidate solutions
-    Verify whether each candidate solution is correct, returning (verification reasoning, verification) for each.
-
-    CRITICALLY, this function gives back the verifications in the same order as the candidate solutions
-    """
-
-    async def generate_verification(
+async def _generate_verification(
         row_id: int,
         problem: str,
         ground_truth_solution: str,
         candidate_solution: str,
         solution_idx: int,
+        update_request_count: Callable[[str], None],
+        strong_verifier_name: str
     ) -> VerificationResult:
         retries_remaining = 5
         while retries_remaining:
@@ -273,11 +260,27 @@ async def generate_strong_verifications(
                     print(f"Fatal: Ran out of retries, reraising error.")
                     raise e
 
-    # Thing to note: I don't think it's necessarily going to be true that the solution_idx will be the same as the solution_idx in the generate_solutions call, since tasks might complete out of order.
-    # TODO(SAM): Check this, or consider adding some sorting somehow, prior to returning results? I don't know.
+
+
+async def generate_strong_verifications(
+    row_id: int,
+    problem: str,
+    ground_truth_solution: str,
+    candidate_solutions: list[str],
+    update_request_count: Callable[[str], None], 
+    strong_verifier_name: str
+) -> list[VerificationResult]:
+    """
+    Given a question, ground-truth solution, andcollection of collection of candidate solutions
+    Verify whether each candidate solution is correct, returning (verification reasoning, verification) for each.
+
+    CRITICALLY, this function gives back the verifications in the same order as the candidate solutions
+    """
+
+    # Verifications may be out of order, since tasks might complete out of order.
     verification_tasks: list[VerificationResult] = [
-        generate_verification(
-            row_id, problem, ground_truth_solution, candidate_solution, solution_idx
+        _generate_verification(
+            row_id, problem, ground_truth_solution, candidate_solution, solution_idx, update_request_count, strong_verifier_name
         )
         for solution_idx, candidate_solution in enumerate(candidate_solutions)
     ]
