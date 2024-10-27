@@ -86,7 +86,7 @@ async def persistently_get_incorrect_prefixes(row: pd.Series, n_prefixes_to_gene
     for coroutine in atqdm(
         asyncio.as_completed(coroutines),
         total=len(coroutines),
-        desc=f"Processing {len(coroutines)} incorrect prefixes (async)"
+        desc=f"Padding out {len(coroutines)} incorrect prefixes for row {row['row_id']} (async)"
     ):
         result = await coroutine
         prefix_rows.append(result)
@@ -94,39 +94,90 @@ async def persistently_get_incorrect_prefixes(row: pd.Series, n_prefixes_to_gene
     return pd.DataFrame(prefix_rows)
 
 
+# This is the old version of complete_prefixes that sam wrote (vs cursor); it does the row_ids serially.
+# async def complete_prefixes(df: pd.DataFrame, n_incorrect_prefixes: int):
+#     """
+#     Given a dataframe of solvable problems with extracted prefixes, "pad out" the solved problems' prefixes to n_incorrect prefixes.
+#     """
+
+#     accumulated_padded_dfs = []
+#     for row_id in df["row_id"].unique():
+#         # Get the subset of the dataframe for this row_id
+#         sub_df = df[df["row_id"] == row_id]
+
+#         # Determine how many more prefixes we need to generate for this problem
+#         n_prefixes_to_generate = n_incorrect_prefixes - len(sub_df)
+
+#         # Get the first row from sub_df; This has some useful data for the new rows to construct
+#         first_row = sub_df.iloc[0]  # This should never error
+
+#         # Get a new dataframe of remaining prefixes for the problem
+#         new_prefix_df = await persistently_get_incorrect_prefixes(first_row, n_prefixes_to_generate)
+        
+#         # Concatenate the sub_df and the new_prefix_df, then reset the solution_idxs..
+#         padded_sub_df = pd.concat([sub_df, new_prefix_df], ignore_index=True)
+#         padded_sub_df['solution_idx'] = range(len(padded_sub_df))
+        
+#         # Add the combined dataframe to our accumulated results
+#         accumulated_padded_dfs.append(padded_sub_df)
+    
+#     # Now that we have a df for every row_id, concatenate them all together.
+#     padded_df = pd.concat(accumulated_padded_dfs, ignore_index=True)
+
+#     # Let's just confirm that it's sorted by (row_id, solution_idx) by resorting
+#     padded_df = padded_df.sort_values(by=["row_id", "solution_idx"])
+
+#     return padded_df
+
+
+# This is the new version of complete_prefixes that sonnet 3.6 wrote; it does the row_ids concurrently.
 async def complete_prefixes(df: pd.DataFrame, n_incorrect_prefixes: int):
     """
-    Given a dataframe of solvable problems with extracted prefixes, "pad out" the solved problems' prefixes to n_incorrect prefixes.
+    Given a dataframe of solvable problems with extracted prefixes, "pad out" the solved problems' prefixes to n_incorrect_prefixes.
+    All generation happens concurrently across all row_ids.
     """
-    ...
-
-    accumulated_padded_dfs = []
-    for row_id in df["row_id"].unique():
-        # Get the subset of the dataframe for this row_id
-        sub_df = df[df["row_id"] == row_id]
-
-        # Determine how many more prefixes we need to generate for this problem
-        n_prefixes_to_generate = n_incorrect_prefixes - len(sub_df)
-
-        # Get the first row from sub_df; This has some useful data for the new rows to construct
-        first_row = sub_df.iloc[0]  # This should never error
-
-        # Get a new dataframe of remaining prefixes for the problem
-        new_prefix_df = await persistently_get_incorrect_prefixes(first_row, n_prefixes_to_generate)
-        
-        # Concatenate the sub_df and the new_prefix_df, then reset the solution_idxs..
-        padded_sub_df = pd.concat([sub_df, new_prefix_df], ignore_index=True)
-        padded_sub_df['solution_idx'] = range(len(padded_sub_df))
-        
-        # Add the combined dataframe to our accumulated results
-        accumulated_padded_dfs.append(padded_sub_df)
+    # Create lists to store our generation tasks and their metadata
+    generation_tasks = []
     
-    # Now that we have a df for every row_id, concatenate them all together.
-    padded_df = pd.concat(accumulated_padded_dfs, ignore_index=True)
+    # For each unique solvable row_id, create a coroutine to generate the remaining prefixes.
+    for row_id in df["row_id"].unique():
+        sub_df = df[df["row_id"] == row_id]
+        n_prefixes_to_generate = n_incorrect_prefixes - len(sub_df)
+        
+        if n_prefixes_to_generate > 0:
+            first_row = sub_df.iloc[0]
+            generation_tasks.append({
+                'coroutine': persistently_get_incorrect_prefixes(first_row, n_prefixes_to_generate),
+                'row_id': row_id,
+                'original_sub_df': sub_df
+            })
 
-    # Let's just confirm that it's sorted by (row_id, solution_idx) by resorting
+    # Run all prefix generations concurrently
+    new_prefix_dfs = []
+    if generation_tasks:
+        # Extract the coroutines
+        coroutines = [task['coroutine'] for task in generation_tasks]
+        for task, completed_coroutine in zip(generation_tasks, asyncio.as_completed(coroutines)):
+            new_prefix_df = await completed_coroutine
+            
+            # Combine with original sub_df and reset solution_idxs
+            padded_sub_df = pd.concat([task['original_sub_df'], new_prefix_df], ignore_index=True)
+            padded_sub_df['solution_idx'] = range(len(padded_sub_df))  # "reset" the solution_idxs for the padded sub_df
+            new_prefix_dfs.append(padded_sub_df)
+    
+    # Handle cases where no new prefixes were needed (they didn't make it into generation_tasks or new_prefix_dfs)
+    for row_id in df["row_id"].unique():
+        sub_df = df[df["row_id"] == row_id]
+        if len(sub_df) >= n_incorrect_prefixes:
+            # If we already have enough prefixes, just take the first n_incorrect_prefixes (This should never happen)
+            sub_df = sub_df.head(n_incorrect_prefixes) # "reset" the solution_idxs for the padded sub_df
+            sub_df['solution_idx'] = range(len(sub_df)) 
+            new_prefix_dfs.append(sub_df)
+
+    # Combine all results and make sure that we're sorted by (row_id, solution_idx)
+    padded_df = pd.concat(new_prefix_dfs, ignore_index=True)
     padded_df = padded_df.sort_values(by=["row_id", "solution_idx"])
-
+    
     return padded_df
 
         
@@ -151,7 +202,7 @@ async def main():
     df_with_padded_prefixes = await complete_prefixes(df, n_incorrect_prefixes)
     print(f"Completed padding out prefixes; Now {len(df_with_padded_prefixes)} prefixes for {df_with_padded_prefixes["row_id"].nunique()} Numina problems")
 
-    output_filename = f"datasets/cn_k12_math_problems_prefixes_on_policy_{completer_name}_{df_with_padded_prefixes['row_id'].nunique()}_{n_incorrect_prefixes}.csv"
+    output_filename = f"datasets/cn_k12_math_problems_prefixes_on_policy_{completer_name}_{df_with_padded_prefixes['row_id'].nunique()}_{n_incorrect_prefixes}_BETA.csv"
 
     print(f"Saving to {output_filename}...")
     df_with_padded_prefixes.to_csv(output_filename, index=False)
