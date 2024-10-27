@@ -5,9 +5,6 @@ from tqdm.asyncio import tqdm as atqdm
 
 from utils import generate_solution, generate_verification, get_naive_prefix, get_update_request_count
 
-# completer_name = (  # Weak Completer
-#     "command-r-03-2024"  # Instruction-following conversational model (128k ctx)
-# )
 completer_name = (  # Strong Completer
     "command-r-plus-08-2024"  # Most capable as of 10/12/2024 (128k ctx)
 )
@@ -140,11 +137,10 @@ async def complete_prefixes(df: pd.DataFrame, n_incorrect_prefixes: int):
 # We would just need to make sure that for every row_id in a batch, all existing solution_idx are present, from the dataframe.
 async def main():
     # Note If n_incorrect_prefixes is already less than the number of incorrect prefixes that already exist for a given problem, we will just use the existing prefixes (# > n_incorrect_prefixes)
-    n_incorrect_prefixes = 2
+    n_incorrect_prefixes = 5
 
     # Input filename should point to a csv of a datframe with prefixes for incorrect, solvable problems.
-    input_filename = ""
-    output_filename = ""
+    input_filename = "datasets/cn_k12_math_problems_srip_command-r-plus-08-2024_2_2.csv"
 
     print(f"Reading dataframe from {input_filename}...")
     df = pd.read_csv(input_filename)
@@ -154,6 +150,8 @@ async def main():
     print("Padding out prefixes...")
     df_with_padded_prefixes = await complete_prefixes(df, n_incorrect_prefixes)
     print(f"Completed padding out prefixes; Now {len(df_with_padded_prefixes)} prefixes for {df_with_padded_prefixes["row_id"].nunique()} Numina problems")
+
+    output_filename = f"datasets/cn_k12_math_problems_prefixes_on_policy_{completer_name}_{df_with_padded_prefixes['row_id'].nunique()}_{n_incorrect_prefixes}.csv"
 
     print(f"Saving to {output_filename}...")
     df_with_padded_prefixes.to_csv(output_filename, index=False)

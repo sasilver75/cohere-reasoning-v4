@@ -65,7 +65,12 @@ Descriptions of scripts:
 
 `generate_prefixes_remaining_on_policy.py`
 - Given the results of `generate_solvable_incorrect_with_extracted_prefixes.py` (specifically the dataframe, rather than the text file of solveable row IDs), generates any remaining required incorrect solution prefixes for the solvable problems.
-<!-- - Saves the results to a csv file, named as (eg) `datasets/cn_k12_math_problems_srip_prefixes_remaining_on_policy_command-r-plus-08-2024_2_2.csv`. -->
+- Doesn't add any columns to the dataframe, but produces a new dataframe with additional rows (padding the number of incorrect prefixes to the total number required for each solvable problem).
+- Saves dataframe to a csv file, named as (eg) `datasets/cn_k12_math_problems_prefixes_on_policy_command-r-plus-08-2024_100_5.csv`
+    - `prefixes_on_policy` denotes that these are on-policy prefixes
+    - `command-r-plus-08-2024` denotes the completer model used
+    - `100` denotes the number of solvable problems
+    - `5` denotes the number of incorrect prefixes per solvable problem.
 
 `generate_prefixes_off_policy.py`
 
