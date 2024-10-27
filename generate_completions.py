@@ -13,7 +13,7 @@ from tqdm.asyncio import tqdm as atqdm
 import prompts
 from utils import (
     VerificationResult,
-    _generate_verification,
+    generate_verification,
     get_update_request_count,
 )
 
@@ -28,7 +28,7 @@ verifier_name = "command-r-plus-08-2024"  # Strong Verifier - Most capable as of
 update_request_count = get_update_request_count(report_every_n_requests=1)
 
 
-async def verify_row(row: pd.Series) -> VerificationResult:
+async def verify_row_completion(row: pd.Series) -> VerificationResult:
     """
     Verify a single row of a dataframe.
     """
@@ -39,7 +39,7 @@ async def verify_row(row: pd.Series) -> VerificationResult:
     # The full solution is the erroneous prefix + strong completer completion.
     completion_solution = row["prefix"] + " " + row["completion"]
 
-    return await _generate_verification(row_id, problem, ground_truth_solution, completion_solution, solution_idx, update_request_count, verifier_name)
+    return await generate_verification(row_id, problem, ground_truth_solution, completion_solution, solution_idx, update_request_count, verifier_name)
 
 
 async def verify_data(df: pd.DataFrame):
@@ -48,7 +48,7 @@ async def verify_data(df: pd.DataFrame):
     We can do this asynchronously, using co_async instead of co_sync.
     """
     # Create coroutines (doesn't schedule them yet)
-    coroutines = [verify_row(row) for _, row in df.iterrows()]
+    coroutines = [verify_row_completion(row) for _, row in df.iterrows()]
 
     # Kick off and collect results
     results: list[VerificationResult] = []
@@ -60,41 +60,21 @@ async def verify_data(df: pd.DataFrame):
         result = await task
         results.append(result)
 
-    # # CRITICAL: Make sure that the results are sorted in the same order as the candidate solutions.
-    # # Sort the results by (row_id, solution_idx)
-    # sorted_results = sorted(results, key=lambda x: (x.row_id, x.solution_idx))
 
-    # # Now, let's unpack the results into lists to assign as columns in the dataframe.
-    # verifications = [result.verification for result in sorted_results]
-    # verification_reasonings = [
-    #     result.verification_reasoning for result in sorted_results
-    # ]
-    # prefix_reasonings = [result.prefix_reasoning for result in sorted_results]
-    # prefixes = [result.prefix for result in sorted_results]
-
-    # # Assign to dataframe our new columns
-    # new_df = df.copy().sort_values(by=["row_id", "solution_idx"])
-    # new_df["completion_verification_reasoning"] = verification_reasonings
-    # new_df["completion_verification"] = verifications
-    # new_df["completion_prefix_reasoning"] = prefix_reasonings
-    # new_df["completion_verification_prefix"] = prefixes
-    # return new_df
     # Create a DataFrame from verification results
     verification_df = pd.DataFrame(
         [
             {
                 "row_id": res.row_id,
                 "solution_idx": res.solution_idx,
-                "completion_verification": res.verification,
                 "completion_verification_reasoning": res.verification_reasoning,
-                "completion_prefix_reasoning": res.prefix_reasoning,
-                "completion_verification_prefix": res.prefix,
+                "completion_verification": res.verification,
             }
             for res in results
         ]
     )
 
-    # Merge the verification results back to the original dataframe
+    # Merge the verification results back to the original dataframe (stick it to the side, matching in (row_id, solution_idx)
     merged_df = pd.merge(
         df, verification_df, on=["row_id", "solution_idx"], how="left", sort=False
     )
@@ -146,6 +126,7 @@ def complete_row(row: pd.Series) -> str:
     return completion.text
 
 
+# TODO: THIS JUST GENERATES A SINGLE COMPLETION FOR EACH ROW PREFIX. DO WE WANT TO GENERATE MORE?
 def complete_data(df: pd.DataFrame):
     """
     Generate completions for each row in the dataframe.
@@ -165,24 +146,27 @@ def complete_data(df: pd.DataFrame):
 
 
 async def main():
-    n_questions = None  # Number of questions. questions = None means all records;
-    n_solutions_per_question = 5
-    is_on_policy = False
+    # n_problems = None  # Number of questions. questions = None means all records;
+    # n_solutions_per_q = 5
+    is_on_policy = True
 
     source_filename = (
-        "datasets/cn_k12_math_problems_ss_solveable_problems_command-r-03-2024_82_5.csv"
+        "datasets/cn_k12_math_problems_prefixes_on_policy_command-r-plus-08-2024_2_5.csv"
     )
-    output_filename = f"datasets/cn_k12_math_problems_completions_{completer_name}_{n_questions if n_questions is not None else "ALL"}_{n_solutions_per_question}_{"ON" if is_on_policy else "OFF"}.csv"
 
     # Load dataframe
     print(f"Loading dataframe from {source_filename}...")
-    df = (
-        pd.read_csv(source_filename, nrows=n_questions * n_solutions_per_question)
-        if n_questions is not None
-        else pd.read_csv(source_filename)
-    )
+    df = pd.read_csv(source_filename)
     len_df = len(df)
     print(f"Loaded dataframe with {len_df} rows!")
+
+    # Find the number of solution_idxs per row_id
+    n_prefixes_per_problem = df.groupby('row_id')['solution_idx'].nunique().iloc[0]
+    print(f"Number of solutions per question: {n_prefixes_per_problem}")
+
+    # Verify that this number is consistent across all row_ids
+    if not (df.groupby('row_id')['solution_idx'].nunique() == n_prefixes_per_problem).all():
+        raise ValueError("Inconsistent number of solution_idxs across row_ids")
 
     # Process data in batches, accumulate and concatenate results (with checkpointing)
     bs = 125  # This seems to work fine
@@ -220,6 +204,9 @@ async def main():
     print(f"Finished processing {len_df} rows into {len(verified_df)} verified rows")
 
     # Save results to CSV
+    # NumberOfProblems_NumberOfPrefixesPerProblem_NumberOfCompletionsPerPrefix_IsOnPolicy
+    output_filename = f"datasets/cn_k12_math_problems_completions_{completer_name}_{verified_df["row_id"].nunique()}_{n_prefixes_per_problem}_1_{"ON" if is_on_policy else "OFF"}.csv"
+
     print(f"Saving results to {output_filename}...")
     verified_df.to_csv(output_filename, index=False)
     print(f"Saved results to {output_filename}!")

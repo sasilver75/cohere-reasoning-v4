@@ -8,7 +8,7 @@ from flask.json import provider
 app = Flask(__name__)
 
 # Load the CSV file
-csv_path = "datasets/cn_k12_math_problems_completions_command-r-plus-08-2024_ALL_5_OFF_INCORRECT_PREFIXES.csv"
+csv_path = "datasets/cn_k12_math_problems_completions_command-r-plus-08-2024_2_5_1_ON.csv"
 if not os.path.exists(csv_path):
     print(f"Error: CSV file not found at {csv_path}")
     exit(1)
@@ -166,9 +166,6 @@ def index():
                 <h2>Candidate Solution Verification:</h2>
                 <div class="verification-content">{{ completion_data.verification }}</div>
                 
-                <h2>Candidate Solution Prefix Reasoning:</h2>
-                <div class="math-content">{{ completion_data.prefix_reasoning }}</div>
-                
                 <h2>Candidate Solution Prefix:</h2>
                 <div class="math-content">{{ completion_data.prefix }}</div>
             </div>
@@ -189,12 +186,6 @@ def index():
                 
                 <h2>Completion Verification:</h2>
                 <div class="completion-verification-content">{{ completion_data.completion_verification }}</div>
-                
-                <h2>Completion Prefix Reasoning:</h2>
-                <div class="math-content">{{ completion_data.completion_prefix_reasoning }}</div>
-                
-                <h2>Completion Prefix:</h2>
-                <div class="math-content">{{ completion_data.completion_verification_prefix }}</div>
             </div>
         </div>
     </body>
