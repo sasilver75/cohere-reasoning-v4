@@ -25,7 +25,7 @@ co_async = AsyncClientV2(key)
 completer_name = "command-r-plus-08-2024"  # Strong Completer - Most capable as of 10/12/2024 (128k ctx)
 verifier_name = "command-r-plus-08-2024"  # Strong Verifier - Most capable as of 10/12/2024 (128k ctx)
 
-update_request_count = get_update_request_count(report_every_n_requests=1)
+update_request_count = get_update_request_count(report_every_n_requests=10)
 
 
 async def verify_row_completion(row: pd.Series) -> VerificationResult:
@@ -36,10 +36,19 @@ async def verify_row_completion(row: pd.Series) -> VerificationResult:
     ground_truth_solution = row["ground_truth_solution"]
     row_id = row["row_id"]
     solution_idx = row["solution_idx"]
-    # The full solution is the erroneous prefix + strong completer completion.
+    completion_idx = row["completion_idx"]
     completion_solution = row["prefix"] + " " + row["completion"]
 
-    return await generate_verification(row_id, problem, ground_truth_solution, completion_solution, solution_idx, update_request_count, verifier_name)
+    return await generate_verification(
+        row_id=row_id,
+        problem=problem,
+        ground_truth_solution=ground_truth_solution,
+        candidate_solution=completion_solution,
+        solution_idx=solution_idx,
+        update_request_count=update_request_count,
+        strong_verifier_name=verifier_name,
+        completion_idx=completion_idx
+    )
 
 
 async def verify_data(df: pd.DataFrame):
@@ -60,13 +69,13 @@ async def verify_data(df: pd.DataFrame):
         result = await task
         results.append(result)
 
-
     # Create a DataFrame from verification results
     verification_df = pd.DataFrame(
         [
             {
                 "row_id": res.row_id,
                 "solution_idx": res.solution_idx,
+                "completion_idx": res.completion_idx,
                 "completion_verification_reasoning": res.verification_reasoning,
                 "completion_verification": res.verification,
             }
@@ -74,9 +83,13 @@ async def verify_data(df: pd.DataFrame):
         ]
     )
 
-    # Merge the verification results back to the original dataframe (stick it to the side, matching in (row_id, solution_idx)
+    # Merge the verification results back to the original dataframe
     merged_df = pd.merge(
-        df, verification_df, on=["row_id", "solution_idx"], how="left", sort=False
+        df, 
+        verification_df, 
+        on=["row_id", "solution_idx", "completion_idx"],
+        how="left", 
+        sort=False
     )
     return merged_df
 
@@ -126,29 +139,39 @@ def complete_row(row: pd.Series) -> str:
     return completion.text
 
 
-# TODO: THIS JUST GENERATES A SINGLE COMPLETION FOR EACH ROW PREFIX. DO WE WANT TO GENERATE MORE?
-def complete_data(df: pd.DataFrame):
-    """
-    Generate completions for each row in the dataframe.
-    We have to do this synchronously, since the v1 cohere API that supports raw prompting doesn't support async.
-    """
-    new_df = df.copy()
-
+def complete_row_multiple(row: pd.Series, n_completions: int) -> list[str]:
+    """Generate multiple completions for a single row."""
     completions = []
+    for completion_idx in range(n_completions):
+        completion = complete_row(row)  # Reuse existing complete_row function
+        completions.append(completion)
+    return completions
+
+# Changed to async function
+async def complete_data(df: pd.DataFrame, n_completions_per_prefix: int):
+    """
+    Generate n completions for each row in the dataframe.
+    Returns a new dataframe with completion_idx column and expanded rows.
+    """
+    rows = []
     for _, row in tqdm(
-        df.iterrows(), total=len(df), desc=f"Completing {len(df)} rows (Sync)"
+        df.iterrows(), total=len(df), desc=f"Completing {len(df)} row-solution prefixes with {n_completions_per_prefix} completions each (Sync)"
     ):
-        completions.append(complete_row(row))
+        completions = complete_row_multiple(row, n_completions_per_prefix)
+        
+        # Create n_completions_per_prefix rows for each input row
+        for completion_idx, completion in enumerate(completions):
+            new_row = row.copy()
+            new_row["completion"] = completion
+            new_row["completion_idx"] = completion_idx
+            rows.append(new_row)
 
-    new_df["completion"] = completions
-
-    return new_df
+    return pd.DataFrame(rows)
 
 
 async def main():
-    # n_problems = None  # Number of questions. questions = None means all records;
-    # n_solutions_per_q = 5
     is_on_policy = True
+    n_completions_per_prefix = 2  # Configure number of completions per prefix
 
     source_filename = (
         "datasets/cn_k12_math_problems_prefixes_on_policy_command-r-plus-08-2024_2_5.csv"
@@ -158,28 +181,31 @@ async def main():
     print(f"Loading dataframe from {source_filename}...")
     df = pd.read_csv(source_filename)
     len_df = len(df)
-    print(f"Loaded dataframe with {len_df} rows!")
+    print(f"Loaded dataframe with {len_df} row-solution prefixes in total!")
 
     # Find the number of solution_idxs per row_id
     n_prefixes_per_problem = df.groupby('row_id')['solution_idx'].nunique().iloc[0]
-    print(f"Number of solutions per question: {n_prefixes_per_problem}")
+    print(f"Number of solution prefixes per row/problem: {n_prefixes_per_problem}")
 
     # Verify that this number is consistent across all row_ids
     if not (df.groupby('row_id')['solution_idx'].nunique() == n_prefixes_per_problem).all():
-        raise ValueError("Inconsistent number of solution_idxs across row_ids")
+        raise ValueError("Inconsistent number of solution_idxs across row_ids -- This shouldn't happen")
+
+    print(f"This should result in {len_df * n_completions_per_prefix} completions in total")
 
     # Process data in batches, accumulate and concatenate results (with checkpointing)
     bs = 125  # This seems to work fine
     print(f"Processing {len_df} rows in batches of {bs}")
     processed_dfs = []
 
+    # We can naively batch this because each row-solution prefix can be independently completed and verified.
     for i in range(0, len_df, bs):
         batch_df = df.iloc[i : i + bs]
         print(f"Processing batch {i//bs + 1}. Records {i} to {i+bs} of {len_df}")
 
         # Generate completions for the batch (sync)
         print(f"Generating completions for batch {i//bs + 1}...")
-        completion_batch_df = complete_data(batch_df)
+        completion_batch_df = await complete_data(batch_df, n_completions_per_prefix)  # Add await here
         print(f"Finished generating completions for batch {i//bs + 1}")
 
         # Verify the completions for the batch (async)
@@ -205,7 +231,7 @@ async def main():
 
     # Save results to CSV
     # NumberOfProblems_NumberOfPrefixesPerProblem_NumberOfCompletionsPerPrefix_IsOnPolicy
-    output_filename = f"datasets/cn_k12_math_problems_completions_{completer_name}_{verified_df["row_id"].nunique()}_{n_prefixes_per_problem}_1_{"ON" if is_on_policy else "OFF"}.csv"
+    output_filename = f"datasets/cn_k12_math_problems_completions_{completer_name}_{verified_df['row_id'].nunique()}_{n_prefixes_per_problem}_{n_completions_per_prefix}_{'ON' if is_on_policy else 'OFF'}.csv"
 
     print(f"Saving results to {output_filename}...")
     verified_df.to_csv(output_filename, index=False)

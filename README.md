@@ -73,10 +73,21 @@ Descriptions of scripts:
     - `5` denotes the number of incorrect prefixes per solvable problem.
 
 `generate_prefixes_off_policy.py`
+- TBD
 
 
 `generate_completions.py`
-
+- Given the results of either `generate_prefixes_remaining_on_policy.py` or `generate_prefixes_off_policy.py`, generates a configurable number of completions for each row-solution-prefix.
+    - While increasing the number of prefixes per problems (hopefully) increases the number of possible perturbations that we're able to test, increasing the number of completions per prefix gives us a better estimate (when results are averaged across verified prefix-completions) of the true self-correction ability of the completer, for a given prefix.
+- Resulting dataframe has columns: row_id, problem, ground_truth_solution, solution_idx, candidate_solution, verification_reasoning, verification, prefix, completion, completion_idx, completion_verification_reasoning, completion_verification
+- Produces csv files named as (eg) `datasets/cn_k12_math_problems_completions_command-r-plus-08-2024_2_5_2_ON.csv`
+    - `completions` denotes that these are completions
+    - `command-r-plus-08-2024` denotes the completer model used
+    - `2` denotes the number of solvable problems (supplied in input DF)
+    - `5` denotes the number of incorrect prefixes per solvable problem (supplied in input DF)
+    - `2` denotes the number of completions per prefix (generated in this script; multiplying `2` * `5` * `2` = `20` completions in total)
+    - `ON` denotes that these completions are on-policy
+- Now the unit of analysis can be as granular as (row_id, solution_idx, completion_idx) triplets. The output dataframe CSV is ready for downstream analysis and plotting.
 
 ## Viewing results
 

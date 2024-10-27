@@ -159,6 +159,7 @@ VerificationResult = namedtuple(
         "solution_idx",
         "verification_reasoning",
         "verification",
+        "completion_idx",
     ],
 )
 
@@ -166,6 +167,7 @@ def extract_verification_from_response(
     verification_response: str,
     row_id: int,
     solution_idx: int,
+    completion_idx: Optional[int] = 0  # This is only relevant for verifying completions, not solutions.
 ) -> VerificationResult:
     """
     Given a verification response, return whether the verifiation response indicates that the candidate solution was correct.
@@ -198,6 +200,7 @@ def extract_verification_from_response(
         solution_idx=solution_idx,
         verification_reasoning=verification_reasoning,
         verification=verified,
+        completion_idx=completion_idx,
     )
 
 
@@ -208,7 +211,8 @@ async def generate_verification(
         candidate_solution: str,
         solution_idx: int,
         update_request_count: Callable[[str], None],
-        strong_verifier_name: str
+        strong_verifier_name: str,
+        completion_idx: Optional[int] = 0  # This is only relevant for verifying completions, not solutions.
     ) -> VerificationResult:
         retries_remaining = 5
         while retries_remaining:
@@ -232,7 +236,7 @@ async def generate_verification(
                     timeout=60,
                 )
                 return extract_verification_from_response(
-                    response.message.content[0].text, row_id, solution_idx
+                    response.message.content[0].text, row_id, solution_idx, completion_idx
                 )
             except asyncio.TimeoutError as e:
                 print(
