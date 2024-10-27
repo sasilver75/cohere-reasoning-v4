@@ -81,6 +81,7 @@ def read_specific_rows(
 def get_naive_prefix(solution: str) -> str:
     """
     Given a solution, return the first 30% of the solution, rounded to the nearest word.
+    This is a naive way of getting a prefix; it's likely that prefix won't contain a perturbation.
     """
     words = solution.split()
     n_words = len(words)
@@ -88,17 +89,7 @@ def get_naive_prefix(solution: str) -> str:
     return " ".join(words[:n_words_to_take])
 
 
-
-
-
-async def generate_solutions(
-    row_id: int, problem: str, n_solutions_per_problem: int, update_request_count: Callable[[str], None], completer_name: str
-) -> list[str]:
-    """
-    Let's generate (n_solutions_per_problem) solutions for the problems. I'm assuming that this will result in at least one failure, given performance I've seen so far.
-    """
-
-    async def generate_solution(row_id: int, problem: str, solution_idx: str) -> str:
+async def generate_solution(row_id: int, problem: str, solution_idx: str, update_request_count: Callable[[str], None], completer_name: str) -> str:
         retries_remaining = 5
         while retries_remaining:
             try:
@@ -141,12 +132,20 @@ async def generate_solutions(
                     print(f"Fatal: Ran out of retries, teraising error.")
                     raise e
 
+
+async def generate_solutions(
+    row_id: int, problem: str, n_solutions_per_problem: int, update_request_count: Callable[[str], None], completer_name: str
+) -> list[str]:
+    """
+    Let's generate (n_solutions_per_problem) solutions for the problems. I'm assuming that this will result in at least one failure, given performance I've seen so far.
+    """
+
     # Generate n_solutions_per_problem solutions for this problem.
-    solution_tasks = [
-        generate_solution(row_id, problem, solution_idx)
+    coroutines = [
+        generate_solution(row_id, problem, solution_idx, update_request_count, completer_name)
         for solution_idx in range(n_solutions_per_problem)
     ]
-    return await asyncio.gather(*solution_tasks)
+    return await asyncio.gather(*coroutines)
 
 
 
@@ -202,7 +201,7 @@ def extract_verification_from_response(
     )
 
 
-async def _generate_verification(
+async def generate_verification(
         row_id: int,
         problem: str,
         ground_truth_solution: str,
@@ -262,7 +261,7 @@ async def _generate_verification(
 
 
 
-async def generate_strong_verifications(
+async def generate_verifications(
     row_id: int,
     problem: str,
     ground_truth_solution: str,
@@ -277,14 +276,14 @@ async def generate_strong_verifications(
     CRITICALLY, this function gives back the verifications in the same order as the candidate solutions
     """
 
-    # Verifications may be out of order, since tasks might complete out of order.
-    verification_tasks: list[VerificationResult] = [
-        _generate_verification(
+    # Verifications may be out of order, since coroutines might complete out of order.
+    coroutines: list[VerificationResult] = [
+        generate_verification(
             row_id, problem, ground_truth_solution, candidate_solution, solution_idx, update_request_count, strong_verifier_name
         )
         for solution_idx, candidate_solution in enumerate(candidate_solutions)
     ]
-    verification_results = await asyncio.gather(*verification_tasks)
+    verification_results = await asyncio.gather(*coroutines)
 
     # Sort the results based on the solution_idx, so the list given back "matches" the list of candidate solutions.
     return sorted(verification_results, key=lambda x: x.solution_idx)

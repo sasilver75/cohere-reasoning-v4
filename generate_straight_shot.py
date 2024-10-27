@@ -8,7 +8,7 @@ from tqdm.asyncio import tqdm as atqdm
 from utils import (
     VerificationResult,
     generate_solutions,
-    generate_strong_verifications,
+    generate_verifications,
     get_update_request_count,
 )
 
@@ -54,7 +54,7 @@ async def process_row(row: pd.Series, n_solutions_per_problem: int) -> ProcessRe
     # 2) Generate a strong verification for each solution
     # CRITICALLY: THIS GIVES BACK THE VerificationResults IN THE SAME ORDER AS THE SOLUTIONS.
     strong_verifications: list[VerificationResult] = (
-        await generate_strong_verifications(
+        await generate_verifications(
             row_id, problem, ground_truth_solution, solutions, update_request_count, strong_verifier_name
         )
     )
@@ -73,17 +73,17 @@ async def process_row(row: pd.Series, n_solutions_per_problem: int) -> ProcessRe
 
 
 async def process_data(df: pd.DataFrame, n_solutions_per_problem: int) -> pd.DataFrame:
-    tasks = []
+    coroutines = []
     for _, row in df.iterrows():
-        tasks.append(process_row(row, n_solutions_per_problem))
+        coroutines.append(process_row(row, n_solutions_per_problem))
 
     results: list[ProcessResult] = []
-    for task in atqdm(
-        asyncio.as_completed(tasks),
-        total=len(tasks),
+    for coroutine in atqdm(
+        asyncio.as_completed(coroutines),
+        total=len(coroutines),
         desc=f"Processing {len(df)} problems (async)",
     ):
-        result = await task
+        result = await coroutine
         results.append(result)
 
     # Now that we have a list of process results, let's "unpack" it into a dataframe that we'd like to work on?
