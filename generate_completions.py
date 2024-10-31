@@ -171,10 +171,10 @@ async def complete_data(df: pd.DataFrame, n_completions_per_prefix: int):
 
 async def main():
     is_on_policy = True
-    n_completions_per_prefix = 2  # Configure number of completions per prefix
+    n_completions_per_prefix = 5  # Configure number of completions per prefix
 
     source_filename = (
-        "datasets/cn_k12_math_problems_prefixes_on_policy_command-r-plus-08-2024_2_5.csv"
+        "datasets/cn_k12_math_problems_prefixes_on_policy_command-r-plus-08-2024_3_2.csv"
     )
 
     # Load dataframe
@@ -201,7 +201,7 @@ async def main():
     # We can naively batch this because each row-solution prefix can be independently completed and verified.
     for i in range(0, len_df, bs):
         batch_df = df.iloc[i : i + bs]
-        print(f"Processing batch {i//bs + 1}. Records {i} to {i+bs} of {len_df}")
+        print(f"Processing batch {i//bs + 1}. Records {i} to {min(i+bs, len_df)} of {len_df}")
 
         # Generate completions for the batch (sync)
         print(f"Generating completions for batch {i//bs + 1}...")

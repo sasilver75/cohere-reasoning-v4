@@ -8,7 +8,7 @@ from flask.json import provider
 app = Flask(__name__)
 
 # Load the CSV file
-csv_path = "datasets/cn_k12_math_problems_completions_command-r-plus-08-2024_2_5_1_ON.csv"
+csv_path = "datasets/cn_k12_math_problems_completions_command-r-plus-08-2024_3_2_5_ON.csv"
 if not os.path.exists(csv_path):
     print(f"Error: CSV file not found at {csv_path}")
     exit(1)
@@ -30,6 +30,7 @@ def index():
     completion_data = {
         "row_id": int(row.get("row_id", 0)),
         "solution_idx": int(row.get("solution_idx", 0)),
+        "completion_idx": int(row.get("completion_idx", 0)),
         "problem": str(row.get("problem", "N/A")),
         "ground_truth_solution": str(row.get("ground_truth_solution", "N/A")),
         "candidate_solution": str(row.get("candidate_solution", "N/A")),
@@ -146,7 +147,7 @@ def index():
                 {% endif %}
             </div>
         </div>
-        <h2>Row ID: {{ completion_data.row_id }} | Solution Index: {{ completion_data.solution_idx }}</h2>
+        <h2>Row ID: {{ completion_data.row_id }} | Solution Index: {{ completion_data.solution_idx }} | Completion Index: {{ completion_data.completion_idx }}</h2>
         <div class="completion">
             <div class="section">
                 <h2>Problem:</h2>

@@ -78,19 +78,19 @@ def read_specific_rows(
     return pd.concat(filtered_chunks, ignore_index=True) if filtered_chunks else None
 
 
-def get_naive_prefix(solution: str) -> str:
+def get_naive_prefix(solution: str, take: float = 0.3) -> str:
     """
-    Given a solution, return the first 30% of the solution, rounded to the nearest word.
+    Given a solution, return the first {take}% of the solution, rounded to the nearest word.
     This is a naive way of getting a prefix; it's likely that prefix won't contain a perturbation.
     """
     words = solution.split()
     n_words = len(words)
-    n_words_to_take = max(1, int(0.3 * n_words))
+    n_words_to_take = max(1, int(take * n_words))
     return " ".join(words[:n_words_to_take])
 
 
 async def generate_solution(row_id: int, problem: str, solution_idx: str, update_request_count: Callable[[str], None], completer_name: str) -> str:
-        retries_remaining = 5
+        retries_remaining = 20
         while retries_remaining:
             try:
                 update_request_count("generate solution")
@@ -116,7 +116,7 @@ async def generate_solution(row_id: int, problem: str, solution_idx: str, update
                     f"Timeout occurred when generating solution {solution_idx} for problem {row_id}. Retries remaining now {retries_remaining}."
                 )
                 if retries_remaining:
-                    print("Retrying with {retries_remaining} retries remaining.")
+                    print(f"Retrying with {retries_remaining} retries remaining.")
                 else:
                     # If this ever happens (which it shouldn't), let's raise the error so that everything falls over and I can complain to Eddie.
                     print(f"Fatal: Ran out of retries, reraising error.")
@@ -141,6 +141,7 @@ async def generate_solutions(
     """
 
     # Generate n_solutions_per_problem solutions for this problem.
+    # TODO: Add an atqdm progres bar to this!
     coroutines = [
         generate_solution(row_id, problem, solution_idx, update_request_count, completer_name)
         for solution_idx in range(n_solutions_per_problem)
@@ -214,7 +215,7 @@ async def generate_verification(
         strong_verifier_name: str,
         completion_idx: Optional[int] = 0  # This is only relevant for verifying completions, not solutions.
     ) -> VerificationResult:
-        retries_remaining = 5
+        retries_remaining = 20
         while retries_remaining:
             try:
                 update_request_count("generate verification")
@@ -244,7 +245,7 @@ async def generate_verification(
                 )
                 retries_remaining -= 1
                 if retries_remaining:
-                    print("Retrying with {retries_remaining} retries remaining.")
+                    print(f"Retrying with {retries_remaining} retries remaining.")
                 else:
                     # If this ever happens (which it shouldn't), let's raise the error so that everything falls over and I can complain to Eddie.
                     print(f"Fatal: Ran out of retries, reraising error.")

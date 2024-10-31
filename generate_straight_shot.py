@@ -122,8 +122,8 @@ async def process_data(df: pd.DataFrame, n_solutions_per_problem: int) -> pd.Dat
 
 async def main():
     # This is the number of problem/solution pairs to process; it will result in a dataframe with ~ n*10 rows.
-    n_problems = 5  # n = None means all records
-    n_solutions_per_problem = 2
+    n_problems = 500  # n = None means all records
+    n_solutions_per_problem = 5
 
     source_filename = "datasets/original/cn_k12_math_problems.csv"
     target_filename = f"datasets/cn_k12_math_problems_ss_{completer_name}_{n_problems}_{n_solutions_per_problem}.csv"
@@ -161,7 +161,7 @@ async def main():
             print("Waiting for 60 seconds before processing the next batch...")
             await asyncio.sleep(60)
 
-        print(f"Finished processing batch {i}")
+        print(f"Finished processing batch {i//bs + 1}")
 
     processed_df = pd.concat(processed_dfs, ignore_index=True)
     print(

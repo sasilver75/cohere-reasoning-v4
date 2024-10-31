@@ -14,7 +14,7 @@ def extract_and_add_prefixes(df_solvable_incorrect: pd.DataFrame) -> pd.DataFram
 
 
 def main():    
-    input_filename = "datasets/cn_k12_math_problems_ss_command-r-plus-08-2024_5_2.csv"
+    input_filename = "datasets/cn_k12_math_problems_ss_command-r-plus-08-2024_10_5.csv"
     
     # Read the dataframe produced by the generate_straight_shot.py script.
     print(f"Loading dataframe from {input_filename}")
@@ -25,7 +25,7 @@ def main():
     # Now let's determine which problems are "solvable", and filter to those problems. Remember the list of solveable problem row_ids.
     print("Determining which problems are solvable...")
     completion_success_rates = df.groupby("row_id")["verification"].mean()
-    solvable_problems_row_ids = completion_success_rates[(completion_success_rates >= 0.2) & (completion_success_rates <= 0.8)].index.tolist()
+    solvable_problems_row_ids = completion_success_rates[(completion_success_rates >= 0.2) & (completion_success_rates <= 0.6)].index.tolist()
     n_solvable_problems = len(solvable_problems_row_ids)
     print(f"Found {n_solvable_problems} solvable problems out of {df["row_id"].nunique()} problems")
 
@@ -41,10 +41,10 @@ def main():
 
 
     # Save both the list of solveable_problem row_ids (for off-policy prefix generation) and the incorrect solutions (for completion of remaining on-policy prefixes).
-    # For the text filename, replace the ss (straight shot) with sri (solvable row ids) and include the number of solvable problems.
-    output_txt_filename = input_filename.rsplit('_', 2)[0].replace("ss", "sri") + f"_{n_solvable_problems}.txt"
-    # For the df filename, replace the ss (straight shot) with ip (solvable row_ids incorrect prefixes) and include the number of solvable problems and number of incorrect prefixes
-    output_csv_filename = input_filename.rsplit('_', 2)[0].replace("ss", "srip") + f"_{n_solvable_problems}_{len(df_solvable_incorrect_with_prefixes)}.csv"
+    # For the text filename, replace the ss (straight shot) with si (solvable incorrect) and include the number of solvable problems.
+    output_txt_filename = input_filename.rsplit('_', 2)[0].replace("ss", "si") + f"_{n_solvable_problems}.txt"
+    # For the df filename, replace the ss (straight shot) with sip (solvable incorrect prefixes) and include the number of solvable problems and number of incorrect prefixes
+    output_csv_filename = input_filename.rsplit('_', 2)[0].replace("ss", "sip") + f"_{n_solvable_problems}_{len(df_solvable_incorrect_with_prefixes)}.csv"
     print(f"Saving output files {output_csv_filename} and {output_txt_filename}")
     df_solvable_incorrect_with_prefixes.to_csv(output_csv_filename, index=False)
     print(f"Saved incorrect solutions and prefixes for incorrect, solvable problems to {output_csv_filename}")

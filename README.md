@@ -48,14 +48,14 @@ Descriptions of scripts:
 `generate_solvable_incorrect_with_extracted_prefixes.py`
 - Given the results of `generate_straight_shot.py`, does a number of useful things.
     - Determines the collection of solvable problems (i.e. those with success rates of (eg) 20-80%, across solution attempts).
-    - Saves this list of solveable row IDs to a text file, named as (eg) `datasets/cn_k12_math_problems_sri_command-r-plus-08-2024_2.txt`.
-        - `sri` denotes "solveable problem row IDs"
+    - Saves this list of solveable row IDs to a text file, named as (eg) `datasets/cn_k12_math_problems_si_command-r-plus-08-2024_2.txt`.
+        - `si` denotes "solveable incorrect" (Just a list of their ids)
         - `command-r-plus-08-2-24` denotes the completer model used in the previous step; this should not be changed in this step.
         - `2` denotes the number of solvable problems.
     - Filters the original dataframe from `generate_straight_shot.py` to only include the solvable problems, and only the solutions for these problems that were determined to be _incorrect_ by the strong verifier.
     - For this subset, extracts prefixes and adds as a new column `prefix`.
-    - Saves this dataframe to a csv file, named as (eg) `datasets/cn_k12_math_problems_srip_command-r-plus-08-2024_2_2.csv`.
-        - `srip` denotes "solveable problem dataframe with extracted prefixes"
+    - Saves this dataframe to a csv file, named as (eg) `datasets/cn_k12_math_problems_sip_command-r-plus-08-2024_2_2.csv`.
+        - `sip` denotes "solveable incorrect prefixes"
         - `2` denotes the number of solvable problems.
         - `2` denotes the *total* number of incorrect solutions with prefixes generated across all solvable problems. There may be differing numbers of incorrect solutions per solvable problem.
         - This file is saved because it's useful downstream for the `generate_prefixes_remaining_on_policy.py` script, which will generate any remaining required prefixes for the solvable problems. Harveting and saving these on-policy prefixes from the (eg) strong completer straight-shot solutions is just a way of saving compute credits.

@@ -148,17 +148,17 @@ async def complete_prefixes(df: pd.DataFrame, n_incorrect_prefixes: int):
 # We would just need to make sure that for every row_id in a batch, all existing solution_idx are present, from the dataframe.
 async def main():
     # Note If n_incorrect_prefixes is already less than the number of incorrect prefixes that already exist for a given problem, we will just use the existing prefixes (# > n_incorrect_prefixes)
-    n_incorrect_prefixes = 5
+    n_incorrect_prefixes = 2
 
     # Input filename should point to a csv of a datframe with prefixes for incorrect, solvable problems.
-    input_filename = "datasets/cn_k12_math_problems_srip_command-r-plus-08-2024_2_2.csv"
+    input_filename = "datasets/cn_k12_math_problems_sip_command-r-plus-08-2024_3_9.csv"
 
     print(f"Reading dataframe from {input_filename}...")
     df = pd.read_csv(input_filename)
     print(f"Read dataframe with {len(df)} prefixes for {df["row_id"].nunique()} Numina problems")
     print(f"Completing prefixes for {len(df)} solvable problems...")
 
-    print("Padding out prefixes...")
+    print(f"Padding out prefixes to {n_incorrect_prefixes} per solveable problem...")
     df_with_padded_prefixes = await complete_prefixes(df, n_incorrect_prefixes)
     print(f"Completed padding out prefixes; Now {len(df_with_padded_prefixes)} prefixes for {df_with_padded_prefixes["row_id"].nunique()} Numina problems")
 
