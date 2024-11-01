@@ -248,8 +248,8 @@ async def main():
     source_filename = (
         "datasets/cn_k12_math_problems_prefixes_on_policy_command-r-plus-08-2024_191_3_take_0.1_0.3_0.5_0.7.csv"
     )
-    prefix_column = "prefix_take_0.5"
-    output_suffix = "take_0.5"  # A bonus suffix to add to output filename, if needed for experiments
+    prefix_column = "prefix_take_0.7"
+    output_suffix = "take_0.7"  # A bonus suffix to add to output filename, if needed for experiments
 
     # Load dataframe
     print(f"Loading dataframe from {source_filename}...")
