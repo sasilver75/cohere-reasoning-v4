@@ -18,18 +18,20 @@ load_dotenv()
 co_async = AsyncClientV2(api_key=os.getenv("COHERE_API_KEY"))
 
 
-def get_update_request_count(report_every_n_requests: int = 10):
+def get_update_request_count(report_every_n_requests: int = 10) -> Callable[[str], int]:
     """
     A little utility function to help with rate limit debugging.
     Each time the outer function invokes you get a new closure, so you don't have to worry about resetting the count if you create two counters.
 
     Keeps track of the total number of invocations and the occurrences of invocations in the last minute.
     Reports stats every report_every_n_requests invocations.
+
+    Returns the number of calls in the last minute.
     """
     count = 0
     timestamps = deque()
 
-    def update(s: str):
+    def update(s: str) -> int:
         """
         "s" is a string to help with human debugging. You might pass "solution" or "verification" for instance.
         """
@@ -48,6 +50,8 @@ def get_update_request_count(report_every_n_requests: int = 10):
             print(
                 f"{s} | Total requests: {count} | Requests in the last minute: {last_minute_count}"
             )
+        
+        return last_minute_count
 
     return update
 

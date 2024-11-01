@@ -1,5 +1,7 @@
 import asyncio
+import functools
 from types import coroutine
+from numpy import take
 import pandas as pd
 from tqdm.asyncio import tqdm as atqdm
 
@@ -33,11 +35,11 @@ async def persistently_get_incorrect_prefixes(row: pd.Series, n_prefixes_to_gene
         while not found_failure:
             # This is just to make sure that we don't get stuck spending too much money. Likely requires manual examination afterwards as to why that was selected as a solvable problem.
             loop_count += 1
-            if 10 < loop_count > 15:
+            if loop_count > 10:
                 print(f"WARN: Failing to find an incorrect solution for row {row_id} after {loop_count} attempts")
-            if loop_count > 15:
-                print(f"FATAL: Failed to find an incorrect solution for row {row_id} after 15 attempts; Exiting.")
-                raise Exception(f"Failed to find an incorrect solution for row {row_id} after 15 attempts")
+            if loop_count >= 35:
+                print(f"FATAL: Failed to find an incorrect solution for row {row_id} after {loop_count} attempts; Exiting.")
+                raise Exception(f"Failed to find an incorrect solution for row {row_id} after {loop_count} attempts")
 
             # Generate a candidate solution
             candidate_solution: str = await generate_solution(
@@ -64,9 +66,6 @@ async def persistently_get_incorrect_prefixes(row: pd.Series, n_prefixes_to_gene
             # Determine if we should keep trying for an incorrect solution
             found_failure = not verification
 
-        # Now that we've found a failure, we extract the prefix.
-        prefix = get_naive_prefix(candidate_solution)
-
         return {
             "row_id": row_id,
             "problem": problem,
@@ -75,7 +74,6 @@ async def persistently_get_incorrect_prefixes(row: pd.Series, n_prefixes_to_gene
             "candidate_solution": candidate_solution,
             "verification_reasoning": verification_reasoning,
             "verification": verification,
-            "prefix": prefix,
         }
     
     coroutines = [
@@ -94,7 +92,7 @@ async def persistently_get_incorrect_prefixes(row: pd.Series, n_prefixes_to_gene
     return pd.DataFrame(prefix_rows)
 
 
-async def complete_prefixes(df: pd.DataFrame, n_incorrect_prefixes: int):
+async def pad_incorrect_solutions(df: pd.DataFrame, n_incorrect_prefixes: int):
     """
     Given a dataframe of solvable problems with extracted prefixes, "pad out" the solved problems' prefixes to n_incorrect_prefixes.
     All generation happens concurrently across all row_ids.
@@ -104,6 +102,7 @@ async def complete_prefixes(df: pd.DataFrame, n_incorrect_prefixes: int):
     
     # For each unique solvable row_id, create a coroutine to generate the remaining prefixes.
     for row_id in df["row_id"].unique():
+        # Get the sub_df for a given row_id; these are the already-completed
         sub_df = df[df["row_id"] == row_id]
         n_prefixes_to_generate = n_incorrect_prefixes - len(sub_df)
         
@@ -121,7 +120,7 @@ async def complete_prefixes(df: pd.DataFrame, n_incorrect_prefixes: int):
         # Extract the coroutines
         coroutines = [task['coroutine'] for task in generation_tasks]
         for task, completed_coroutine in zip(generation_tasks, asyncio.as_completed(coroutines)):
-            new_prefix_df = await completed_coroutine
+            new_prefix_df = await completed_coroutine # TODO: HANDLING OF THIS NEEDS TO BE CHANGED?
             
             # Combine with original sub_df and reset solution_idxs
             padded_sub_df = pd.concat([task['original_sub_df'], new_prefix_df], ignore_index=True)
@@ -143,29 +142,47 @@ async def complete_prefixes(df: pd.DataFrame, n_incorrect_prefixes: int):
     
     return padded_df
 
+async def generate_prefixes(df: pd.DataFrame, take_ps: list[float]) -> pd.DataFrame:
+    """Given a dataframe of incorrect solutions, generate the prefixes for each solution"""
+    # For each incorrect solution, generate len(take_ps) prefixes as new columns.
+    for take_p in take_ps:
+        print(f"Generating prefixes with take_p {take_p}...")
+        get_take_p_prefix = functools.partial(get_naive_prefix, take=take_p)
+        column_name = f"prefix_take_{take_p}"
+        df[column_name] = df.apply(lambda row: get_take_p_prefix(row["candidate_solution"]), axis=1)
+    return df
 
 # If we wanted to implement batching for this, it's going to be a little bit tricky. 
 # We would just need to make sure that for every row_id in a batch, all existing solution_idx are present, from the dataframe.
 async def main():
     # Note If n_incorrect_prefixes is already less than the number of incorrect prefixes that already exist for a given problem, we will just use the existing prefixes (# > n_incorrect_prefixes)
-    n_incorrect_prefixes = 2
+    n_incorrect_solutions = 3
+    take_ps = [0.1, 0.3, 0.5, 0.7]  # Determines the number and take of prefixes generated
+    suffix_tag = f"take_{"_".join(map(str, take_ps))}"  # A bonus suffix to add to output filename, if needed for experiments
 
-    # Input filename should point to a csv of a datframe with prefixes for incorrect, solvable problems.
-    input_filename = "datasets/cn_k12_math_problems_sip_command-r-plus-08-2024_3_9.csv"
+    # Input filename should point to a csv of a datframe with incorrect, solvable problems (no prefixes).
+    input_filename = "datasets/cn_k12_math_problems_sip_command-r-plus-08-2024_191_636.csv"
 
     print(f"Reading dataframe from {input_filename}...")
     df = pd.read_csv(input_filename)
     print(f"Read dataframe with {len(df)} prefixes for {df["row_id"].nunique()} Numina problems")
     print(f"Completing prefixes for {len(df)} solvable problems...")
 
-    print(f"Padding out prefixes to {n_incorrect_prefixes} per solveable problem...")
-    df_with_padded_prefixes = await complete_prefixes(df, n_incorrect_prefixes)
-    print(f"Completed padding out prefixes; Now {len(df_with_padded_prefixes)} prefixes for {df_with_padded_prefixes["row_id"].nunique()} Numina problems")
+    # Pad out the incorrect solutions for each solvable problem
+    print(f"Padding out incorrect solutions to {n_incorrect_solutions} per solveable problem...")
+    df_with_padded_incorrect_solutions = await pad_incorrect_solutions(df, n_incorrect_solutions)
+    print(f"Completed padding out incorrect solutions; Now {len(df_with_padded_incorrect_solutions)} solutions for {df_with_padded_incorrect_solutions["row_id"].nunique()} Numina problems")
 
-    output_filename = f"datasets/cn_k12_math_problems_prefixes_on_policy_{completer_name}_{df_with_padded_prefixes['row_id'].nunique()}_{n_incorrect_prefixes}.csv"
+    # Generate the n prefixes (based on take_ps) for each incorrect solution
+    print(f"Adding prefixes to {len(df_with_padded_incorrect_solutions)} incorrect solutions using take_ps {take_ps}...")
+    df_with_prefixes = await generate_prefixes(df_with_padded_incorrect_solutions, take_ps)
+    print(f"Completed adding {len(take_ps)} prefixes for each incorrect solution; Now {len(df_with_prefixes)} prefixes in total for {df_with_prefixes["row_id"].nunique()} Numina problems")
+
+
+    output_filename = f"datasets/cn_k12_math_problems_prefixes_on_policy_{completer_name}_{df_with_padded_incorrect_solutions['row_id'].nunique()}_{n_incorrect_solutions}{"_" + suffix_tag if suffix_tag else ""}.csv"
 
     print(f"Saving to {output_filename}...")
-    df_with_padded_prefixes.to_csv(output_filename, index=False)
+    df_with_prefixes.to_csv(output_filename, index=False)
     print("Done!")
 
 

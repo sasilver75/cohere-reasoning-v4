@@ -20,7 +20,7 @@ strong_verifier_name = (
 update_request_count = get_update_request_count(report_every_n_requests=10)
 
 
-async def generate_incorrect_prefix(row: pd.Series, solution_idx: int) -> dict:
+async def generate_incorrect_prefix(row: pd.Series, solution_idx: int, take_p: float) -> dict:
     """Generate a single incorrect solution and extract its prefix"""
     row_id = row["id"]  # Note: using 'id' instead of 'row_id' for original dataset
     problem = row["problem"]
@@ -63,7 +63,7 @@ async def generate_incorrect_prefix(row: pd.Series, solution_idx: int) -> dict:
         found_failure = not verification
 
     # Extract prefix from the incorrect solution
-    prefix = get_naive_prefix(candidate_solution)
+    prefix = get_naive_prefix(candidate_solution, take_p)
 
     return {
         "row_id": row_id,
@@ -93,6 +93,7 @@ async def process_batch(coroutines: list, batch_number: int, total_batches: int)
 async def main():
     BATCH_SIZE = 100
     n_prefixes_per_problem = 5  # Configurable number of prefixes to generate per problem
+    take_p = 0.3 # Configurable take_p for naive prefix generation
     
     # Read the row IDs from the text file
     print("Reading row IDs from text file...")
@@ -115,7 +116,7 @@ async def main():
     all_coroutines = []
     for _, row in original_df.iterrows():
         for solution_idx in range(n_prefixes_per_problem):
-            all_coroutines.append(generate_incorrect_prefix(row, solution_idx))
+            all_coroutines.append(generate_incorrect_prefix(row, solution_idx, take_p))
 
     # Process coroutines in batches
     total_coroutines = len(all_coroutines)
