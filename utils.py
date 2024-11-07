@@ -18,6 +18,7 @@ load_dotenv()
 co_async = AsyncClientV2(api_key=os.getenv("COHERE_API_KEY"))
 
 
+# TODO: The dequeue doesn't have a max size, so could grow without bound... but I think this is totally fine, given how we prune it and how we are going to use it.
 def get_update_request_count(report_every_n_requests: int = 10) -> Callable[[str], int]:
     """
     A little utility function to help with rate limit debugging.

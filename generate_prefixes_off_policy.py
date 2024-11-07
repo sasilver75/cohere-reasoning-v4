@@ -104,8 +104,9 @@ async def main():
     print("Reading row IDs from text file...")
     with open("datasets/cn_k12_math_problems_si_command-r-plus-08-2024_191.txt", "r") as f:
         row_ids = set(int(line.strip()) for line in f)
-    row_id_filters = set([340]) # These are for problems that we just can't get incorrect solutions for...
-    row_ids = row_ids - row_id_filters
+    # row_id_filters = set([340]) # These are for problems that we just can't get incorrect solutions for...
+    # row_ids = row_ids - row_id_filters
+    row_ids = [340]
     print(f"Found {len(row_ids)} solvable problem row IDs")
 
     # Read the corresponding rows from the original dataset
