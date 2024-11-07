@@ -240,16 +240,16 @@ async def complete_data_parallel(df: pd.DataFrame, n_completions_per_prefix: int
 
     return pd.DataFrame(rows)
 
-
+# TODO: HEY! REMEMBER TO CHANGE THESE FIRST THINGS BETWEEN RUNS!
 async def main():
-    is_on_policy = True
+    is_on_policy = False
     n_completions_per_prefix = 5  # Configure number of completions per prefix
 
     source_filename = (
-        "datasets/cn_k12_math_problems_prefixes_on_policy_command-r-plus-08-2024_191_3_take_0.1_0.3_0.5_0.7.csv"
+        "datasets/cn_k12_math_problems_prefixes_off_policy_command-r-03-2024_191_3_take_01_03_05_07.csv"
     )
-    prefix_column = "prefix_take_0.7"
-    output_suffix = "take_0.7"  # A bonus suffix to add to output filename, if needed for experiments
+    prefix_column = "prefix_take_0.3"
+    output_suffix = "take_0.3"  # A bonus suffix to add to output filename, if needed for experiments
 
     # Load dataframe
     print(f"Loading dataframe from {source_filename}...")
