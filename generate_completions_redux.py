@@ -232,7 +232,7 @@ async def complete_data_parallel(df: pd.DataFrame, n_completions_per_prefix: int
 
 
 async def main():
-    is_on_policy = False
+    is_on_policy = True
     n_completions_per_prefix = 5
 
     # Define prefix configurations here
@@ -249,8 +249,9 @@ async def main():
     bs = 10
 
     source_filename = (
-        "datasets/cn_k12_math_problems_prefixes_off_policy_command-r-03-2024_191_3_take_01_03_05_07.csv"
+        "datasets/cn_k12_math_problems_prefixes_on_policy_command-r-plus-08-2024_191_3_take_0.1_0.3_0.5_0.7_MIXUP.csv"
     )
+    output_suffix = "MIXUP"
 
     # Load dataframe
     print(f"Loading dataframe from {source_filename}...")
@@ -311,7 +312,7 @@ async def main():
     output_filename = (
         f"datasets/cn_k12_math_problems_completions_{completer_name}"
         f"_{verified_df['row_id'].nunique()}_{n_prefixes_per_problem}_{n_completions_per_prefix}"
-        f"_{'ON' if is_on_policy else 'OFF'}_take_{"_".join(str(take) for take in prefix_takes)}_COMBINED.csv"
+        f"_{'ON' if is_on_policy else 'OFF'}_take_{"_".join(str(take) for take in prefix_takes)}_COMBINED{"_"+ output_suffix if output_suffix else ''}.csv"
     )
 
     print(f"Saving results to {output_filename}...")
