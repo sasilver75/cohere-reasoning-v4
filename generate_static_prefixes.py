@@ -1,6 +1,34 @@
 import pandas as pd
 
 from utils import read_specific_rows
+from tqdm import tqdm
+import random
+
+def generate_static_prefix(row: pd.Series, idx: int) -> dict:
+    """
+    For a row from the original cn_k12 dataset, generate an "incorrect solution" and a static prefix
+    randomly sampled from our list of static prefixes.
+
+    Goal is to:
+    row_id	problem	ground_truth_solution	solution_idx	candidate_solution	verification_reasoning	verification	prefix
+    """
+    # Read the static prefixes file and select a random prefix
+    with open("static_prefixes.txt", "r") as f:
+        prefixes = f.readlines()
+    prefix = random.choice(prefixes).strip()
+
+    # Assemble the dictionary representation of the row
+    dict = {
+        "row_id": row["id"],
+        "problem": row["problem"],
+        "ground_truth_solution": row["solution"],
+        "solution_idx": idx,
+        "candidate_solution": "[Solution Placeholder]", # This can just be a placeholder; doesn't need to be anything
+        "verification_reasoning": "[Verification Reasoning Placeholder]", # This can just be a placeholder; doesn't need to be anything
+        "verification": False, # We're not verifying these, so they're all "incorrect"
+        "prefix": prefix
+    }
+    return dict
 
 
 def main():
@@ -22,13 +50,20 @@ def main():
         row_ids=row_ids
     )
 
-    # For every row, we need to generate some "incorrect solutions" and prefixes.
+    # For every row, we need to generate some {n_prefixes_per_problem} "incorrect solutions" and prefixes.
+    acc = []
+    for _, row in tqdm(original_df.iterrows(), total=len(original_df), desc="Generating static prefixes"):
+        for idx in range(n_prefixes_per_problem):
+            acc.append(generate_static_prefix(row, idx))
     
+    # Create a dataframe from the accumulated results
+    df = pd.DataFrame(acc)
+    print(f"Generated {len(df)} static prefixes for {len(row_ids)} problems.")
 
-
-    # Path to the output file. TODO: Also add the length of the dataframe before
-    output_filepath = f"datasets/cn_k12_math_problems_static_prefixes_{n_prefixes_per_problem}.txt"
-
+    # Path to the output file.
+    output_filepath = f"datasets/cn_k12_math_problems_prefixes_static_{len(row_ids)}_{n_prefixes_per_problem}.csv"
+    df.to_csv(output_filepath, index=False)
+    print(f"Saved static prefixes to {output_filepath}")
 
 
 if __name__ == "__main__":
