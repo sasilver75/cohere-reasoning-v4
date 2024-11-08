@@ -148,7 +148,7 @@ def complete_row_for_prefix(row: pd.Series, prefix_col: str) -> str:
             completion = future.result(timeout=60)
     except Exception as e:
         print(
-            f"Error generating completion for row {row['row_id']} (solution {row['solution_idx']}, prefix {prefix_col}): {e}"
+            f"Error generating completion for row {row['row_id']} (solution {row['solution_idx']}, prefix {prefix_col}): Type: {type(e).__name__}, Message: {str(e)}, Full repr: {repr(e)}"
         )
         raise e
 
