@@ -114,7 +114,7 @@ async def verify_data(df: pd.DataFrame, prefix_columns: list[str]):
 
 def retry_callback(retry_state):
     # This is a fallback value used if we fail all retries because of (eg) timeouts.
-    print(f"ALL RETRIES FAILED")
+    print(f"ALL RETRIES FAILED: {retry_state}")
     return "~FAILED~"
 
 
@@ -239,6 +239,15 @@ async def main():
     prefix_takes = [0.3, 0.5, 0.7]
     prefix_columns = [f"prefix_take_{p}" for p in prefix_takes]
 
+    # THINKING: If we want to limit requests to 500/min. For a given input row, we have to do len(prefix_takes)*2 requests (1 for completion, 1 for verification).
+    # But we should also think about how often we expect to have to do retries.
+    # If we target 300 requests/min without retries, then if our bs=30 and len(prefix_takes)=3, we're at 30*3*2=180 requests/min.
+    # AH, but you forgot that we generate the completions (roughly sync) and then the verifications all at once, async. So we really just want to worry about bs*len(prefix_takes)*n_completions_per_prefix
+    # ANyways, I'm off to class, so going to run with bs20; Edit: That crashed on the first batch with too many requests. Trying again with 10. That hit 300 RPM max for first batch. let's cross fingers.
+    # - 10 rows × 5 completions × 3 prefixes = 150 completion requests
+    # - Each completion needs verification = 150 verification requests (total: 300)
+    bs = 10
+
     source_filename = (
         "datasets/cn_k12_math_problems_prefixes_off_policy_command-r-03-2024_191_3_take_01_03_05_07.csv"
     )
@@ -246,7 +255,6 @@ async def main():
     # Load dataframe
     print(f"Loading dataframe from {source_filename}...")
     df = pd.read_csv(source_filename)
-    df = df[:6] # TEST; DELETE ME!
     len_df = len(df)
     print(f"Loaded dataframe with {len_df} row-solution prefixes in total!")
 
@@ -261,7 +269,6 @@ async def main():
     print(f"This should result in {len_df * n_completions_per_prefix * len(prefix_columns)} completions in total, returned in {len_df * n_completions_per_prefix} rows")
 
     # Process data in batches
-    bs = 35
     print(f"Processing {len_df} rows in batches of {bs}")
     processed_dfs = []
 
@@ -304,7 +311,7 @@ async def main():
     output_filename = (
         f"datasets/cn_k12_math_problems_completions_{completer_name}"
         f"_{verified_df['row_id'].nunique()}_{n_prefixes_per_problem}_{n_completions_per_prefix}"
-        f"_{'ON' if is_on_policy else 'OFF'}_take_{"_".join(str(take) for take in prefix_takes)}.csv"
+        f"_{'ON' if is_on_policy else 'OFF'}_take_{"_".join(str(take) for take in prefix_takes)}_COMBINED.csv"
     )
 
     print(f"Saving results to {output_filename}...")
