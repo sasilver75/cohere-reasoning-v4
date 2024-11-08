@@ -119,7 +119,7 @@ def retry_callback(retry_state):
 
 
 @retry(
-    stop=stop_after_attempt(20),
+    stop=stop_after_attempt(30),
     retry=retry_if_exception_type(Exception),
     retry_error_callback=retry_callback
 )

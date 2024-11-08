@@ -37,6 +37,8 @@ def main():
     """
     # Path to the collection of solvable problem ids. We're going to create 
     input_filepath = "datasets/cn_k12_math_problems_si_command-r-plus-08-2024_191.txt"
+    # TODO: NOTE: It might not make sense to have > 1 fixed prefixes per problem? Because the prefixes are all going to be different across solution_idx for a given row_id.
+    # Though perhaps even with "random" prefixes, different problems might be more or less recoverable, so I guess it does make sense.
     n_prefixes_per_problem = 3
 
     # Read the row ids from the text file
