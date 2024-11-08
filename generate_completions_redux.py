@@ -232,12 +232,14 @@ async def complete_data_parallel(df: pd.DataFrame, n_completions_per_prefix: int
 
 
 async def main():
-    is_on_policy = True
+    is_on_policy = False
     n_completions_per_prefix = 5
 
     # Define prefix configurations here
-    prefix_takes = [0.3, 0.5, 0.7]
-    prefix_columns = [f"prefix_take_{p}" for p in prefix_takes]
+    # prefix_takes = [0.3, 0.5, 0.7]
+    # prefix_columns = [f"prefix_take_{p}" for p in prefix_takes]
+    prefix_takes = []
+    prefix_columns = ["prefix"]  # This is different for the static completions.
 
     # THINKING: If we want to limit requests to 500/min. For a given input row, we have to do len(prefix_takes)*2 requests (1 for completion, 1 for verification).
     # But we should also think about how often we expect to have to do retries.
@@ -249,9 +251,9 @@ async def main():
     bs = 10
 
     source_filename = (
-        "datasets/cn_k12_math_problems_prefixes_on_policy_command-r-plus-08-2024_191_3_take_0.1_0.3_0.5_0.7_MIXUP.csv"
+        "datasets/cn_k12_math_problems_prefixes_static_191_3.csv"
     )
-    output_suffix = "MIXUP"
+    output_suffix = "STATIC"
 
     # Load dataframe
     print(f"Loading dataframe from {source_filename}...")
@@ -262,10 +264,6 @@ async def main():
     # Find the number of solution_idxs per row_id
     n_prefixes_per_problem = df.groupby('row_id')['solution_idx'].nunique().iloc[0]
     print(f"Number of solution prefixes per row/problem: {n_prefixes_per_problem}")
-
-    # # Verify that this number is consistent across all row_ids
-    # if not (df.groupby('row_id')['solution_idx'].nunique() == n_prefixes_per_problem).all():
-    #     raise ValueError("Inconsistent number of solution_idxs across row_ids")
 
     print(f"This should result in {len_df * n_completions_per_prefix * len(prefix_columns)} completions in total, returned in {len_df * n_completions_per_prefix} rows")
 
