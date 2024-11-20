@@ -146,7 +146,7 @@ def index():
                 <h2>Incorrect Solution:</h2>
                 <div class="math-content">{{ completion_data['candidate_solution'] }}</div>
 
-                <h2>Incorrect Prefix Verification Reasoning:</h2>
+                <h2>Reasoning for Incorrect Solution Verification:</h2>
                 <div class="math-content">{{ completion_data['verification_reasoning'] }}</div>
             </div>
             <div class="section">
